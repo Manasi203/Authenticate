@@ -1,5 +1,6 @@
-//jshint esversion:6
-require('dotenv').config();
+
+const bcrypt=require("bcrypt");
+const saltRounds=10;
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
@@ -11,7 +12,7 @@ app.use(bodyParser.urlencoded({
 app.use(express.static("public"));
 app.set('view engine', 'ejs');
 const mongoose = require('mongoose');
-const encrypt = require('mongoose-encryption');
+
 mongoose.set('strictQuery', false);
 mongoose.connect("mongodb://127.0.0.1:27017/userDB", { useNewUrlParser: true });
 
@@ -19,8 +20,8 @@ const userSchema=new mongoose.Schema({
   email:String,
   password:String
 })
-                         //key to encrypt database
-userSchema.plugin(encrypt,{secret:process.env.SECRET,encryptedFields:["password"]});
+//                          //key to encrypt database
+// userSchema.plugin(encrypt,{secret:process.env.SECRET,encryptedFields:["password"]});
 const User=mongoose.model("User",userSchema);
 
 
@@ -36,20 +37,27 @@ app.get("/register",function(req,res){
 })
 
 app.post("/register",function(req,res){
-  const newUser=new User({
-    email:req.body.username,
-    password:req.body.password
-  })
-  newUser.save();
-  res.render("secrets");                                       //only when registered
+  bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+    const newUser=new User({
+      email:req.body.username,
+      password:hash
+    })
+    newUser.save();
+    res.render("secrets");
+});
+                                    //only when registered
 })
 
 app.post("/login",function(req,res){
   User.findOne({email:req.body.username},function(err,results){
     if(err){res.render(err);}
     else{  if(results){
-        if(results.password===req.body.password)
-           res.render("secrets");
+        bcrypt.compare(req.body.password, results.password, function(err, result) {
+              // result == true
+              if(result)res.render("secrets");
+       });
+
+
       }}
 
   })
